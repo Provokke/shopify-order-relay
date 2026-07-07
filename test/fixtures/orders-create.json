@@ -1,0 +1,12 @@
+{
+  "id": 820982911946154500,
+  "admin_graphql_api_id": "gid://shopify/Order/820982911946154500",
+  "name": "#1001",
+  "email": "jane.example@example.com",
+  "currency": "AUD",
+  "total_price": "129.90",
+  "line_items": [
+    { "sku": "TEE-BLK-M", "title": "Black Tee (M)", "quantity": 2 },
+    { "sku": null, "title": "Gift wrap", "quantity": 1 }
+  ]
+}
