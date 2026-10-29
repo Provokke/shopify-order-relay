@@ -1,0 +1,43 @@
+# Captured from: npm run demo:scenario  (2026-10-29, Node 24, Windows; real output, timings vary)
+In-process demo server on http://127.0.0.1:64830 (in-memory SQS/DynamoDB stand-ins, mock downstream)
+
+  +0.032s  INFO       downstream set to ok
+
+== 1. Valid signed order webhook: accepted, queued, delivered once
+  +0.051s  ACCEPTED   wh=demo-1 orders/create -> 200 signature valid, queued for the worker
+  +0.065s  DELIVERED  attempt #1 key=dev-store.myshopify.com:orders/create:demo-1 -> 200, stored
+  +0.066s  PROCESSED  wh=demo-1 order relayed (sent)
+
+== 2. Same payload, tampered after signing: rejected with 401
+  +0.098s  REJECTED   wh=demo-2 orders/create -> 401 signature does not match the body, not queued
+
+== 3. Shopify re-sends delivery demo-1: deduped, not delivered again
+  +0.143s  DEDUPED    wh=demo-1 orders/create -> 200 duplicate delivery id, acknowledged but not queued again
+
+== 4. Downstream returns 500 twice: worker fails, SQS retries with backoff, then delivered once
+  +0.205s  INFO       downstream set to 500 for the next 2 request(s)
+  +0.221s  ACCEPTED   wh=demo-3 orders/create -> 200 signature valid, queued for the worker
+  +0.236s  DOWNSTREAM attempt #2 key=dev-store.myshopify.com:orders/create:demo-3 -> 500 (injected failure)
+  +0.237s  INFO       wh=demo-3 worker error: TransientError: destination returned 500
+  +0.237s  RETRY      wh=demo-3 failed attempt 1/4, back on the queue, visible again in 393ms
+  +0.656s  DOWNSTREAM attempt #3 key=dev-store.myshopify.com:orders/create:demo-3 -> 500 (injected failure)
+  +0.656s  INFO       wh=demo-3 worker error: TransientError: destination returned 500
+  +0.656s  RETRY      wh=demo-3 failed attempt 2/4, back on the queue, visible again in 752ms
+  +1.435s  DELIVERED  attempt #4 key=dev-store.myshopify.com:orders/create:demo-3 -> 200, stored
+  +1.436s  PROCESSED  wh=demo-3 order relayed (sent)
+
+== 5. Downstream hangs once (relay times out after 1s): retried, delivered once
+  +1.482s  INFO       downstream set to timeout for the next 1 request(s)
+  +1.497s  ACCEPTED   wh=demo-4 orders/create -> 200 signature valid, queued for the worker
+  +1.514s  DOWNSTREAM attempt #5 key=dev-store.myshopify.com:orders/create:demo-4 -> no response (injected timeout)
+  +2.526s  INFO       wh=demo-4 worker error: TransientError: destination unreachable: TimeoutError: The operation was aborted due to timeout
+  +2.526s  RETRY      wh=demo-4 failed attempt 1/4, back on the queue, visible again in 321ms
+  +2.853s  DELIVERED  attempt #6 key=dev-store.myshopify.com:orders/create:demo-4 -> 200, stored
+  +2.853s  PROCESSED  wh=demo-4 order relayed (sent)
+
+== 6. Summary
+  webhooks sent: 5 requests (4 distinct delivery ids; demo-1 sent twice, demo-2 tampered)
+  unique orders delivered downstream: 3 (expected 3: demo-1, demo-3, demo-4)
+  downstream attempts including failures: 6
+  duplicate deliveries that reached downstream: 0 (expected 0)
+  dead-lettered: 0

@@ -11,6 +11,9 @@
     "typecheck": "tsc --noEmit",
     "lint": "eslint .",
     "test": "vitest run",
+    "demo:local": "npm run build && node dist/demo/main.js",
+    "demo:send": "npm run build && node dist/demo/scenario.js --url http://127.0.0.1:8787",
+    "demo:scenario": "npm run build && node dist/demo/scenario.js",
     "check": "npm run typecheck && npm run lint && npm test"
   },
   "dependencies": {
