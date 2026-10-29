@@ -54,6 +54,44 @@ npm run build      # emits dist/
 
 To exercise the handlers by hand, import `createIngestHandler` with the in-memory store and queue (see `test/ingest.test.ts`) and feed it an event built with `webhookEvent()` from `test/helpers.ts`. `.env.example` lists what the deployed functions read.
 
+## Local demo (no AWS, no Shopify)
+
+This is a local demo only. Nothing is deployed and nothing leaves your machine. It runs the real ingest and worker handlers against in-memory stand-ins for SQS and DynamoDB (`src/demo/`), plus a mock downstream that can be told to fail. The stand-ins model visibility-delay retries, receive counts and a DLQ, not real SQS/DynamoDB behaviour, so it shows the logic, not AWS semantics.
+
+```bash
+npm run demo:scenario   # one command: starts everything, runs the scripted tour, prints the trace, exits
+```
+
+Or run the server and drive it yourself:
+
+```bash
+npm run demo:local      # terminal 1: http://127.0.0.1:8787/webhooks/shopify (PORT, HOST, SHOPIFY_API_SECRET override)
+npm run demo:send       # terminal 2: signed sample webhooks
+```
+
+The tour sends a valid signed order (ACCEPTED, DELIVERED), a tampered body (REJECTED 401), a repeated delivery id (DEDUPED), then makes the downstream return 500 twice and hang once so you see RETRY with backoff and a single delivery per order. A real captured run is in [docs/demo-output.txt](docs/demo-output.txt).
+
+Hand-made requests (default demo secret shown):
+
+```bash
+SECRET=demo-shopify-client-secret
+BODY=$(cat test/fixtures/orders-create.json)
+SIG=$(printf '%s' "$BODY" | openssl dgst -sha256 -hmac "$SECRET" -binary | base64)
+curl -i -X POST http://127.0.0.1:8787/webhooks/shopify \
+  -H "Content-Type: application/json" -H "X-Shopify-Hmac-SHA256: $SIG" \
+  -H "X-Shopify-Webhook-Id: curl-1" -H "X-Shopify-Topic: orders/create" \
+  -H "X-Shopify-Shop-Domain: dev-store.myshopify.com" --data-binary "$BODY"
+# make the downstream fail the next 2 requests, then resend with a new Webhook-Id
+curl -X POST http://127.0.0.1:8787/control/downstream -d '{"mode":"500","times":2}'   # or "timeout", "ok"
+```
+
+### Pointing a real Shopify dev store at it later
+
+1. Start the server with your app's client secret: `SHOPIFY_API_SECRET=<client secret> npm run demo:local` (shell env only, never commit it).
+2. Expose it with a tunnel you trust, for example `cloudflared tunnel --url http://127.0.0.1:8787` or `ngrok http 8787`.
+3. In the dev store create an `orders/create` webhook (Settings, Notifications, Webhooks, or the Admin API) with URL `https://<tunnel-host>/webhooks/shopify`.
+4. Place a test order and watch the trace. The worker uses the webhook payload (it does not call the Admin API in the demo). This path has not been exercised against a real store; see Status.
+
 ## Deploy (described, not provided)
 
 No IaC is included on purpose; agencies have their own (CDK, SAM, Terraform, SST). The resources needed:
@@ -94,7 +132,7 @@ Secrets belong in SSM Parameter Store or Secrets Manager, resolved at cold start
 
 Verified, offline:
 
-- `npm run typecheck` (TypeScript strict, `noUncheckedIndexedAccess`, `exactOptionalPropertyTypes`), `npm run lint` and `npm test` (35 tests) pass locally. CI runs the same plus a build.
+- `npm run typecheck` (TypeScript strict, `noUncheckedIndexedAccess`, `exactOptionalPropertyTypes`), `npm run lint` and `npm test` (45 tests, 10 of them for the local demo wiring) pass locally. CI runs the same plus a build.
 - Tests cover HMAC accept/reject cases, ingest status codes and duplicate handling, the worker's lease/retry/partial-failure behaviour, GraphQL throttling, 429 and 5xx handling, and the DynamoDB command shapes.
 
 **Not verified:**
