@@ -1,11 +1,13 @@
 {
   "name": "shopify-order-relay",
-  "version": "0.1.0",
-  "description": "Serverless Shopify webhook ingestion and relay: HMAC verification, idempotency, retries with backoff, throttle-aware GraphQL client, DLQ-ready worker.",
+  "version": "0.4.0",
+  "description": "Webhook ingestion, idempotent processing and reliable delivery for Shopify orders",
   "license": "MIT",
-  "private": true,
+  "private": false,
   "type": "module",
-  "engines": { "node": ">=20" },
+  "engines": {
+    "node": ">=20"
+  },
   "scripts": {
     "build": "tsc -p tsconfig.build.json",
     "typecheck": "tsc --noEmit",
@@ -28,5 +30,48 @@
     "typescript": "^5.5.0",
     "typescript-eslint": "^8.0.0",
     "vitest": "^2.0.0"
-  }
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Provokke/shopify-order-relay.git"
+  },
+  "author": "Provokke",
+  "keywords": [
+    "shopify",
+    "webhooks",
+    "orders",
+    "relay",
+    "idempotent",
+    "sqs",
+    "lambda"
+  ],
+  "exports": {
+    ".": {
+      "types": "./dist/src/types.d.ts",
+      "default": "./dist/src/lambda.js"
+    },
+    "./ingest": {
+      "types": "./dist/src/ingest/handler.d.ts",
+      "default": "./dist/src/ingest/handler.js"
+    },
+    "./worker": {
+      "types": "./dist/src/worker/handler.d.ts",
+      "default": "./dist/src/worker/handler.js"
+    },
+    "./hmac": {
+      "types": "./dist/src/hmac.d.ts",
+      "default": "./dist/src/hmac.js"
+    },
+    "./retry": {
+      "types": "./dist/src/retry.d.ts",
+      "default": "./dist/src/retry.js"
+    }
+  },
+  "main": "./dist/src/lambda.js",
+  "types": "./dist/src/types.d.ts",
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ]
 }
